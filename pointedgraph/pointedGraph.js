@@ -392,6 +392,15 @@ $rdf.PointedGraph = function() {
         });
     }
 
+    $rdf.PointedGraph.prototype.addNewStatement = function(pointer, rel, object, why) {
+      this.store.add(pointer, rel, object, why);
+    }
+
+    $rdf.PointedGraph.prototype.removeStatement = function(pointer, rel, object, why) {
+      var st = $rdf.st(pointer, rel, object, why);
+      this.store.remove(st);
+    }
+
     $rdf.PointedGraph.prototype.ajaxPut = function (baseUri, data, success, error, done) {
         $.ajax({
             type: "PUT",
