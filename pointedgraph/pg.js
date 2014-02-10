@@ -15,6 +15,8 @@ $rdf.PG = {
     }
 }
 
+
+
 $rdf.PG.Utils = {
 
     /**
@@ -124,6 +126,56 @@ $rdf.PG.Utils = {
             .flatten()
             .value();
         return res;
+    }
+
+}
+
+$rdf.PG.Utils.Rx = {
+
+    /**
+     * Permits to create an RxJs observable based on a list of promises
+     * @param promiseList the list of promise you want to convert as an RxJs Observable
+     * @param subject the type of Rx Subject you want to use (default to ReplaySubject)
+     * @param onError, an optional callback for handling errors
+     * @return {*}
+     */
+    promiseListToObservable: function(promiseList, subject, onError) {
+        if ( promiseList.length == 0 ) {
+            return Rx.Observable.empty();
+        }
+        // Default to ReplaySubject
+        var subject = subject || new Rx.ReplaySubject();
+        // Default to non-blocking error logging
+        var onError = onError || function(error) {
+            console.debug("Promise error catched in promiseListToObservable: ",error);
+            // true means the stream won't continue.
+            return false;
+        };
+        var i = 0;
+        promiseList.map(function(promise) {
+            promise.then(
+                function (promiseValue) {
+                    subject.onNext(promiseValue);
+                    i++;
+                    if ( i == promiseList.length ) {
+                        subject.onCompleted();
+                    }
+                },
+                function (error) {
+                    var doStop = onError(error);
+                    if ( doStop ) {
+                        subject.onError(error);
+                    }
+                    else {
+                        i++;
+                        if ( i == promiseList.length ) {
+                            subject.onCompleted();
+                        }
+                    }
+                }
+            )
+        });
+        return subject.asObservable();
     }
 
 }

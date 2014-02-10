@@ -46,7 +46,7 @@
             return hePg.hasPointerTripleMatching( FOAF("knows") , personPg.pointer);
         };
 
-        var potentialFriendStream = personPg.followPath( [FOAF("knows"), FOAF("knows")])
+        var potentialFriendStream = personPg.followPath( [FOAF("knows"), FOAF("knows")] )
                 .filter($rdf.PG.Filters.isSymbolPointer)
                 .distinct(function (pg) {
                     return $rdf.PG.Transformers.symbolPointerToValue(pg);

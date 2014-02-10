@@ -124,16 +124,11 @@ $rdf.PointedGraph = function() {
         });
     }
 
-    /**
-     * Like rel but does not return pointed graphs but simply the objects part of the predicates.
-     * @param rel
-     * @return {*}
-     */
-    $rdf.PointedGraph.prototype.relObjects = function (rel) {
-        $rdf.PG.Utils.checkArgument( $rdf.PG.Utils.isSymbolNode(rel) , "The argument should be a symbol:"+rel);
-        var resList = this.getCurrentDocumentTriplesMatching(this.pointer, rel, undefined, false);
-        return _.chain(resList).map($rdf.PG.Transformers.literalPointerToValue).value();
+    $rdf.PointedGraph.prototype.relFirst = function(relUri) {
+        var l = this.rel(relUri);
+        if (l.length > 0) return l[0];
     }
+
 
     /**
      * This is the reverse of "rel": this permits to know which PG in the current graph/document points to the given pointer
@@ -149,11 +144,16 @@ $rdf.PointedGraph = function() {
         });
     }
 
+    $rdf.PointedGraph.prototype.revFirst = function(relUri) {
+        var l = this.rev(relUri);
+        if (l.length > 0) return l[0];
+    }
+
     /**
      * Same as "rel" but follow mmultiple predicates/rels
      * @returns {*}
      */
-        // Array[relUri] => Array[Pgs]
+        // Array[relUri] => Array[Pgs] TODO to rework
     $rdf.PointedGraph.prototype.rels = function() {
         var self = this;
         var pgList = _.chain(arguments)
@@ -165,43 +165,18 @@ $rdf.PointedGraph = function() {
         return pgList;
     }
 
-    $rdf.PointedGraph.prototype.defaultJumpErrorCallback = function(jumpError) {
-        console.debug("PG jump error",jumpError );
-    }
-
     /**
      * This permits to follow a relation in the local graph and then jump asynchronously.
      * This produces a stream of pointed graphs in the form of an RxJs Observable
      * @param Observable[PointedGraph]
      * @param onJumpError
      */
-    $rdf.PointedGraph.prototype.jumpRelObservable = function(relUri,onJumpErrorCallback) {
-        var onJumpErrorCallback = onJumpErrorCallback || this.defaultJumpErrorCallback;
+    $rdf.PointedGraph.prototype.jumpRelObservable = function(relUri) {
         var pgList = this.rel(relUri);
-        if ( pgList.length == 0 ) {
-            return Rx.Observable.empty();
-        }
-        var i = 0;
-        var subject = new Rx.ReplaySubject();
-        pgList.map(function(pg) {
-            pg.jumpAsync().then(
-                function (jumpedPG) {
-                    subject.onNext(jumpedPG);
-                    i++;
-                    if ( i == pgList.length ) {
-                        subject.onCompleted();
-                    }
-                },
-                function (jumpError) {
-                    onJumpErrorCallback(jumpError);
-                    i++;
-                    if ( i == pgList.length ) {
-                        subject.onCompleted();
-                    }
-                }
-            )
+        var pgPromiseList = pgList.map(function(pg) {
+            return pg.jumpAsync();
         });
-        return subject.asObservable();
+        return $rdf.PG.Utils.Rx.promiseListToObservable(pgPromiseList);
     }
 
     /**
@@ -210,8 +185,8 @@ $rdf.PointedGraph = function() {
      * @param onJumpErrorCallback
      * @return {*}
      */
-    $rdf.PointedGraph.prototype.followPath = function(relPath,onJumpErrorCallback) {
-        return this.jumpRelPathObservable(relPath,onJumpErrorCallback);
+    $rdf.PointedGraph.prototype.followPath = function(relPath) {
+        return this.jumpRelPathObservable(relPath);
     }
 
     /**
@@ -220,20 +195,21 @@ $rdf.PointedGraph = function() {
      * @param onJumpErrorCallback optional callback to handle jump errors, because they are not emitted in the stream
      * @return {*}
      */
-    $rdf.PointedGraph.prototype.jumpRelPathObservable = function(relPath,onJumpErrorCallback) {
+    $rdf.PointedGraph.prototype.jumpRelPathObservable = function(relPath) {
         if ( relPath.length == 0 ) {
             return Rx.Observable.empty();
         }
         else {
             var headRel = relPath[0];
             var tailRel = relPath.slice(1);
-            var headStream = this.jumpRelObservable(headRel,onJumpErrorCallback);
+            var headStream = this.jumpRelObservable(headRel);
             if ( tailRel.length == 0 ) {
                 return headStream;
             }
             else {
                 return headStream.flatMap(function(pg) {
-                    return pg.jumpRelPathObservable(tailRel,onJumpErrorCallback);
+                    var tailStream = pg.jumpRelPathObservable(tailRel);
+                    return tailStream;
                 })
             }
         }
@@ -336,46 +312,28 @@ $rdf.PointedGraph = function() {
         return literalValueList;
     }
 
-    $rdf.PointedGraph.prototype.relFirst = function(relUri) {
-        var l = this.rel(relUri);
-        if (l.length > 0) return l[0];
-    }
-
-    $rdf.PointedGraph.prototype.revFirst = function(relUri) {
-        var l = this.rev(relUri);
-        if (l.length > 0) return l[0];
-    }
-
     // Interaction with the PGs.
     $rdf.PointedGraph.prototype.delete = function(relUri, value) {
-        var query =
-            'PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n' +
-                'DELETE DATA \n' +
-                '{' + "<" + this.pointer.value + ">" + relUri + ' "' + value + '"' + '. \n' + '}';
-
-
-        // Sparql request return a promise.
+        // TODO to rework? remove hardcoded namespace value
+        var query = 'PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n' +
+            'DELETE DATA \n' +
+            '{' + "<" + this.pointer.value + ">" + relUri + ' "' + value + '"' + '. \n' + '}';
         return sparqlPatch(this.pointer.value, query);
     }
 
     $rdf.PointedGraph.prototype.insert = function(relUri, value) {
-        var query =
-            'PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n' +
-                'INSERT DATA \n' +
-                '{' + "<" + this.pointer.value + ">" + relUri + ' "' + value + '"' + '. \n' + '}';
-
-        // Sparql request return a promise.
+        // TODO to rework? remove hardcoded namespace value?
+        var query = 'PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n' +
+            'INSERT DATA \n' +
+            '{' + "<" + this.pointer.value + ">" + relUri + ' "' + value + '"' + '. \n' + '}';
         return sparqlPatch(this.pointer.value, query);
     }
 
     $rdf.PointedGraph.prototype.update = function (relUri, newValue, oldvalue) {
-        var query =
-            'DELETE DATA \n' +
-                '{' + "<" + this.pointer.value + "> " + relUri + ' "' + oldvalue + '"' + '} ;\n' +
-                'INSERT DATA \n' +
-                '{' + "<" + this.pointer.value + "> " + relUri + ' "' + newValue + '"' + '. } ';
-
-        // Sparql request return a promise.
+        var query = 'DELETE DATA \n' +
+            '{' + "<" + this.pointer.value + "> " + relUri + ' "' + oldvalue + '"' + '} ;\n' +
+            'INSERT DATA \n' +
+            '{' + "<" + this.pointer.value + "> " + relUri + ' "' + newValue + '"' + '. } ';
         return sparqlPatch(this.pointer.value, query);
     }
 
@@ -392,13 +350,12 @@ $rdf.PointedGraph = function() {
         });
     }
 
-    $rdf.PointedGraph.prototype.addNewStatement = function(pointer, rel, object, why) {
-      this.store.add(pointer, rel, object, why);
+    $rdf.PointedGraph.prototype.addRel = function(rel, object) {
+        this.store.add( this.pointer, rel, object, this.why() );
     }
 
-    $rdf.PointedGraph.prototype.removeStatement = function(pointer, rel, object, why) {
-      var st = $rdf.st(pointer, rel, object, why);
-      this.store.remove(st);
+    $rdf.PointedGraph.prototype.removeRel = function(rel, object) {
+        this.store.removeMany( this.pointer, rel, object, this.why() );
     }
 
     $rdf.PointedGraph.prototype.ajaxPut = function (baseUri, data, success, error, done) {
@@ -501,11 +458,17 @@ $rdf.PointedGraph = function() {
      * @returns {*}
      */
     $rdf.PointedGraph.prototype.getCurrentDocumentTriplesMatching = function (pointer,rel,object,onlyOne) {
-        // In the actual version it seems that RDFLib use the fetched url as the "why"
-        // Maybe it's because we have modified it a little bit to work better with our cors proxy.
-        // This is why we need to pass the namedGraphFetchUrl and not the namedGraphUrl
-        var why = this.namedGraphFetchUrl;
-        return this.store.statementsMatching(pointer, rel, object, why, onlyOne);
+        var why = this.why();
+        return this.store.statementsMatching(pointer, rel, object, this.why(), onlyOne);
+    }
+
+    /**
+     * In the actual version it seems that RDFLib use the fetched url as the "why"
+     * Maybe it's because we have modified it a little bit to work better with our cors proxy.
+     * This is why we need to pass the namedGraphFetchUrl and not the namedGraphUrl
+     */
+    $rdf.PointedGraph.prototype.why = function() {
+        return this.namedGraphFetchUrl;
     }
 
     /**
