@@ -196,22 +196,18 @@ $rdf.PointedGraph = function() {
      * @return {*}
      */
     $rdf.PointedGraph.prototype.jumpRelPathObservable = function(relPath) {
-        if ( relPath.length == 0 ) {
-            return Rx.Observable.empty();
+        $rdf.PG.Utils.checkArgument(relPath && relPath.length > 0,"No relation to follow! "+relPath);
+        var head = relPath[0];
+        var tail = relPath.slice(1);
+        var headStream = this.jumpRelObservable(head);
+        if ( _.isEmpty(tail) ) {
+            return headStream;
         }
         else {
-            var headRel = relPath[0];
-            var tailRel = relPath.slice(1);
-            var headStream = this.jumpRelObservable(headRel);
-            if ( tailRel.length == 0 ) {
-                return headStream;
-            }
-            else {
-                return headStream.flatMap(function(pg) {
-                    var tailStream = pg.jumpRelPathObservable(tailRel);
-                    return tailStream;
-                })
-            }
+            return headStream.flatMap(function(pg) {
+                var tailStream = pg.jumpRelPathObservable(tail);
+                return tailStream;
+            })
         }
     }
 
