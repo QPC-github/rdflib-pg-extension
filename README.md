@@ -222,6 +222,29 @@ There's also an exemple of [using requireJS](https://github.com/stample/rdflib.j
 
 You can also play with this prebuilt [JsFiddle](http://jsfiddle.net/D5Gqs/4/)
 
+## Metadatas
+
+rdflib doesn't make it really easy to understand how to get simple metadatas after a document has been fetched.
+Actually fetch metadatas are stored as RDF triples into the store, under a request and response BNode that are not obvious to retrieve.
+
+So we added some helper code to make it easier.
+
+```javascript
+    store.fetcher.fetch(henryFoafProfileUrl)
+            .then(function(henryPg) {
+                var metadataHelper = henryPg.currentDocumentMetadataHelper();
+                console.debug(henryFoafProfileUrl);
+                console.debug(metadataHelper.getResponseStatus());
+                console.debug(metadataHelper.getResponseStatusText());
+                console.debug(metadataHelper.getResponseHeaderValue("Content-Type"));
+            })
+            .fail(function(fetchError) {
+                console.warn("Can't fetch the pointed graph at",henryFoafProfileUrl,fetchError);
+            });
+```
+
+
+
 ## CORS Proxy
 
 Here are some CORS proxy that you can use:
@@ -250,6 +273,17 @@ $rdf.Fetcher.CrossSiteProxyTemplate = "http://data.fm/proxy?uri=";
 
 We do not recommend using it. 
 Actually the integration of our lib with RDFLib is not perfect and it doesn't work with the regular RDFLib proxy.
+
+## Changelog
+
+### 0.1.1
+
+- Preregister some commonly used namespaces in `$rdf.PG.Namespaces`
+- Add possibility to easily get PG's underlying document metadatas like http status code, response headers...
+
+### 0.1.0
+
+- The initial version
 
 
 ## Download
