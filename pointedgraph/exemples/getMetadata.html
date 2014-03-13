@@ -23,52 +23,35 @@
 
     var fetcherTimeout = 3000;
     var store = $rdf.PG.createNewStore(fetcherTimeout);
+
+    // You can use an URL with or without a fragment, it will give you different
+    // pointer graphs with the same underlying document/namedGraph.
     var henryFoafProfileUrl = "http://bblfish.net/people/henry/card#me";
 
-    var friendCounter=0;
 
+    // You can fetch it, it returns a Q promise of pointed graph.
+    // The pointer will be Henry's foaf:Person subject
     store.fetcher.fetch(henryFoafProfileUrl)
             .then(function(henryPg) {
-                printFriendNames(henryPg);
+                var metadataHelper = henryPg.currentDocumentMetadataHelper();
+                $("#pgUrl").text(henryFoafProfileUrl);
+                $("#status").text(metadataHelper.getResponseStatus());
+                $("#statustext").text(metadataHelper.getResponseStatusText());
+                $("#contentype").text(metadataHelper.getResponseHeaderValue("Content-Type"));
             })
             .fail(function(fetchError) {
                 console.warn("Can't fetch the pointed graph at",henryFoafProfileUrl,fetchError);
             });
 
-    function printFriendNames(personPg) {
-        var personFriendStream = personPg.jumpRelObservable( FOAF("knows") );
-
-        var personFriendNameStream = personFriendStream.flatMap(function(friendPg) {
-            return Rx.Observable.fromArray( friendPg.rel(FOAF("name")) ).take(1);
-        });
-
-        handleNameStream(personFriendNameStream);
-    }
-
-    function handleNameStream(nameStream) {
-        nameStream.subscribe(
-                function(namePg) {
-                    var friendFriendName = namePg.pointer.toString();
-                    $("#friendList").append("<li>"+friendFriendName+" ("+namePg.getCurrentDocumentUrl()+")</li>")
-                    friendCounter++;
-                    $("#counter").html(friendCounter);
-                },
-                function(error) {
-                    console.error("Unexpected end of stream",error, error.stack);
-                },
-                function() {
-                    $("#end").html(" -> End");
-                }
-        );
-    }
 
 </script>
 
 <div>
-    <h3>Nb friends = <span id="counter">0</span><span id="end"/></h3>
-    <ul id="friendList"/>
+    <h3>Metadatas for = <span id="pgUrl"/></h3>
+    <div>Status: <span id="status"></span></div>
+    <div>StatusText: <span id="statustext"></span></div>
+    <div>Content-Type: <span id="contentype"></span></div>
 </div>
-
 
 </body>
 </html>
