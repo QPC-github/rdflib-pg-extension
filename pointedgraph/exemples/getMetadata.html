@@ -34,12 +34,12 @@
     store.fetcher.fetch(henryFoafProfileUrl)
             .then(function(henryPg) {
                 var metadataHelper = henryPg.currentDocumentMetadataHelper();
-                var wacHelper = henryPg.webAccessControlHelper();
                 $("#pgUrl").text(henryFoafProfileUrl);
                 $("#status").text(metadataHelper.getResponseStatus());
                 $("#statustext").text(metadataHelper.getResponseStatusText());
                 $("#contentype").text(metadataHelper.getResponseHeaderValue("Content-Type"));
-                $("#wacmodes").text(wacHelper.getWacModes());
+                $("#wacmoderead").text(henryPg.allowWacMode("READ"));
+                $("#wacmodewrite").text(henryPg.allowWacMode("WRITE"));
             })
             .fail(function(fetchError) {
                 console.warn("Can't fetch the pointed graph at",henryFoafProfileUrl,fetchError);
@@ -53,7 +53,8 @@
     <div>Status: <span id="status"></span></div>
     <div>StatusText: <span id="statustext"></span></div>
     <div>Content-Type: <span id="contentype"></span></div>
-    <div>WebAccessControl modes: <span id="wacmodes"></span></div>
+    <div>WebAccessControl READ: <span id="wacmoderead"></span></div>
+    <div>WebAccessControl WRITE: <span id="wacmodewrite"</span></div>
 </div>
 
 </body>

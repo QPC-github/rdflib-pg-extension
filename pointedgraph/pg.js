@@ -150,9 +150,6 @@ $rdf.PG.WebAccessControlHelper = {
     parseAllowHeaderNode: function(allowHeaderNode) {
         $rdf.PG.Utils.checkArgument($rdf.PG.Utils.isLiteralNode(allowHeaderNode),"The allow header node should be a literal");
         var allowHeaderString = allowHeaderNode.value;
-        console.debug("allowHeaderNode = ",allowHeaderNode);
-        console.debug("allowHeaderString = ",allowHeaderString);
-
         return this.parseAllowHeaderString(allowHeaderString)
     },
 
@@ -204,6 +201,12 @@ $rdf.PG.WebAccessControlHelper = {
             },
             getWacModes: function() {
                 return wacModes;
+            },
+            allowWacMode: function(wacMode) {
+                return _.contains(wacModes,wacMode);
+            },
+            allowWacVerb: function(wacVerb) {
+                return _.contains(wacVerbs,wacVerb);
             }
         }
     }

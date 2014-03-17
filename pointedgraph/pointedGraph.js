@@ -474,6 +474,10 @@ $rdf.PointedGraph = function() {
         return $rdf.PG.WebAccessControlHelper.forPointedGraph(this);
     }
 
+    $rdf.PointedGraph.prototype.allowWacMode = function(wacMode) {
+        return this.webAccessControlHelper().allowWacMode(wacMode);
+    }
+
     /**
      * In the actual version it seems that RDFLib use the fetched url as the "why"
      * Maybe it's because we have modified it a little bit to work better with our cors proxy.
