@@ -57,7 +57,7 @@ $rdf.PG.MetadataHelper = {
         }
     },
 
-    getRequestNode: function(pg) {
+    getRequestNode: function(store,pg) {
         var fetchUriAsLit = $rdf.lit(pg.why().uri);
         var stmts = store.statementsMatching(undefined, $rdf.PG.Namespaces.LINK("requestedURI"), fetchUriAsLit, store.fetcher.appNode);
         this.assertSingleStatement(stmts,"There should be exactly one request node");
@@ -65,14 +65,14 @@ $rdf.PG.MetadataHelper = {
         return stmt.subject;
     },
 
-    getResponseNode: function(requestNode) {
+    getResponseNode: function(store,requestNode) {
         var stmts = store.statementsMatching(requestNode, $rdf.PG.Namespaces.LINK("response"), undefined);
         this.assertSingleStatement(stmts,"There should be exactly one response node");
         var stmt = stmts[0];
         return stmt.object;
     },
 
-    getResponseHeaderValue: function(responseNode,headerName) {
+    getResponseHeaderValue: function(store,responseNode,headerName) {
         var headerSym = $rdf.PG.Namespaces.HTTPH(headerName.toLowerCase());
         var stmts = store.statementsMatching(responseNode, headerSym, undefined, responseNode);
         if ( !stmts || stmts.length == 0 ) return undefined;
@@ -80,7 +80,7 @@ $rdf.PG.MetadataHelper = {
         return stmt.object;
     },
 
-    getResponseStatus: function(responseNode) {
+    getResponseStatus: function(store,responseNode) {
         var statusSym = $rdf.PG.Namespaces.HTTP("status");
         var stmts = store.statementsMatching(responseNode, statusSym, undefined, responseNode);
         this.assertSingleStatement(stmts,"There should be exactly one response node");
@@ -88,7 +88,7 @@ $rdf.PG.MetadataHelper = {
         return stmt.object;
     },
 
-    getResponseStatusText: function(responseNode) {
+    getResponseStatusText: function(store,responseNode) {
         var statusSym = $rdf.PG.Namespaces.HTTP("statusText");
         var stmts = store.statementsMatching(responseNode, statusSym, undefined, responseNode);
         this.assertSingleStatement(stmts,"There should be exactly one response node");
@@ -106,8 +106,9 @@ $rdf.PG.MetadataHelper = {
      */
     forPointedGraph: function(pg) {
         var self = this;
-        var requestNode = this.getRequestNode(pg);
-        var responseNode = this.getResponseNode(requestNode);
+        var pgStore = pg.store;
+        var requestNode = this.getRequestNode(pgStore,pg);
+        var responseNode = this.getResponseNode(pgStore,requestNode);
         return {
             getRequestNode: function() {
                 return requestNode;
@@ -116,13 +117,13 @@ $rdf.PG.MetadataHelper = {
                 return responseNode;
             },
             getResponseStatus: function() {
-                return self.getResponseStatus(responseNode);
+                return self.getResponseStatus(pgStore,responseNode);
             },
             getResponseStatusText: function() {
-                return self.getResponseStatusText(responseNode);
+                return self.getResponseStatusText(pgStore,responseNode);
             },
             getResponseHeaderValue: function(headerName) {
-                return self.getResponseHeaderValue(responseNode,headerName);
+                return self.getResponseHeaderValue(pgStore,responseNode,headerName);
             }
         }
     }
