@@ -57,6 +57,11 @@ $rdf.PG.MetadataHelper = {
         }
     },
 
+    logAllWithSubject: function(store,subject) {
+        var stmts = store.statementsMatching(subject);
+        console.debug("Statements for subject",subject," = ",stmts);
+    },
+
     getRequestNode: function(store,pg) {
         var fetchUriAsLit = $rdf.lit(pg.why().uri);
         var stmts = store.statementsMatching(undefined, $rdf.PG.Namespaces.LINK("requestedURI"), fetchUriAsLit, store.fetcher.appNode);
@@ -73,6 +78,7 @@ $rdf.PG.MetadataHelper = {
     },
 
     getResponseHeaderValue: function(store,responseNode,headerName) {
+        this.logAllWithSubject(store,responseNode);
         var headerSym = $rdf.PG.Namespaces.HTTPH(headerName.toLowerCase());
         var stmts = store.statementsMatching(responseNode, headerSym, undefined, responseNode);
         if ( !stmts || stmts.length == 0 ) return undefined;
@@ -130,6 +136,79 @@ $rdf.PG.MetadataHelper = {
 
 }
 
+
+$rdf.PG.WebAccessControlHelper = {
+
+
+    /*
+     It looks like:
+     Literal {value: "OPTIONS, GET, HEAD", lang: undefined, datatype: undefined, termType: "literal", toString: function…}
+     datatype: undefined
+     lang: undefined
+     value: "OPTIONS, GET, HEAD"
+     */
+    parseAllowHeaderNode: function(allowHeaderNode) {
+        $rdf.PG.Utils.checkArgument($rdf.PG.Utils.isLiteralNode(allowHeaderNode),"The allow header node should be a literal");
+        var allowHeaderString = allowHeaderNode.value;
+        console.debug("allowHeaderNode = ",allowHeaderNode);
+        console.debug("allowHeaderString = ",allowHeaderString);
+
+        return this.parseAllowHeaderString(allowHeaderString)
+    },
+
+
+    // Returns the allowed http verbs
+    parseAllowHeaderString: function(allowHeaderString) {
+        var array = allowHeaderString.split(",");
+        return _.chain(array)
+            .map(function(headerValue) { return headerValue.trim().toUpperCase(); })
+            .value();
+    },
+
+    // See https://www.w3.org/wiki/WebAccessControl#WAC_relation_to_HTTP_Verbs
+    // TODO this should be reworked in the future
+    getWacModesFromVerbs: function(verbs) {
+        var modes = [];
+        if ( _.contains(verbs,"GET") ) {
+            modes.push("READ");
+        }
+        if ( _.contains(verbs,"POST")
+            && _.contains(verbs,"PUT")
+            && _.contains(verbs,"PATCH")
+            && _.contains(verbs,"DELETE") ) {
+            modes.push("WRITE");
+        }
+        if ( _.contains(verbs,"POST") ) {
+            modes.push("APPEND");
+        }
+        // TODO how can we know if we have CONTROL access on the ACL ??????
+        return modes;
+    },
+
+    forPointedGraph: function(pg) {
+        var self = this;
+        var metadataHelper = $rdf.PG.MetadataHelper.forPointedGraph(pg);
+        var allowHeaderNode = metadataHelper.getResponseHeaderValue("Allow");
+        var wacVerbs;
+        if ( allowHeaderNode ) {
+            wacVerbs = this.parseAllowHeaderNode(allowHeaderNode);
+        }
+        // If no Allow header then we consider we have GET Access
+        else {
+            wacVerbs = ["GET"];
+        }
+        var wacModes = this.getWacModesFromVerbs(wacVerbs);
+        return {
+            getWacVerbs: function() {
+                return wacVerbs;
+            },
+            getWacModes: function() {
+                return wacModes;
+            }
+        }
+    }
+
+}
 
 
 $rdf.PG.Utils = {

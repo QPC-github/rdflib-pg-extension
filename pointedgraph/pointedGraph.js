@@ -467,6 +467,14 @@ $rdf.PointedGraph = function() {
     }
 
     /**
+     * Builds a WebAccessControl helper to get the permissions available on the pg's underlying document
+     * @return {*}
+     */
+    $rdf.PointedGraph.prototype.webAccessControlHelper = function() {
+        return $rdf.PG.WebAccessControlHelper.forPointedGraph(this);
+    }
+
+    /**
      * In the actual version it seems that RDFLib use the fetched url as the "why"
      * Maybe it's because we have modified it a little bit to work better with our cors proxy.
      * This is why we need to pass the namedGraphFetchUrl and not the namedGraphUrl
