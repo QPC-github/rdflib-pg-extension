@@ -28,10 +28,9 @@
     // pointer graphs with the same underlying document/namedGraph.
     var henryFoafProfileUrl = "http://bblfish.net/people/henry/card#me";
 
-
     // You can fetch it, it returns a Q promise of pointed graph.
     // The pointer will be Henry's foaf:Person subject
-    store.fetcher.fetch(henryFoafProfileUrl)
+    store.fetcher.fetch(henryFoafProfileUrl,undefined, undefined, {jqueryAjaxOptions: undefined})
             .then(function(henryPg) {
                 var metadataHelper = henryPg.currentDocumentMetadataHelper();
                 $("#pgUrl").text(henryFoafProfileUrl);

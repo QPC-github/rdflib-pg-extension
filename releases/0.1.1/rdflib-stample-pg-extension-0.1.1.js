@@ -1060,9 +1060,10 @@ $rdf.Fetcher.prototype.proxifySymbolIfNeeded = function(symbol) {
  * @param {String} uri to fetch as string. The URI may contain a fragment because it results in a pointedGraph
  * @param {String} referringTerm the uri as string. Referring to the requested url
  * @param {boolean} force, force fetching of resource even if already in store
+ * @param {options} options for the fetching operation (see rdflib #36)
  * @return {Promise} of a pointedGraph
  */
-$rdf.Fetcher.prototype.fetch = function(uri, referringTerm, force) {
+$rdf.Fetcher.prototype.fetch = function(uri, referringTerm, force, options) {
     var self = this;
     var uriSym = $rdf.sym(uri);
     var docUri = $rdf.PG.Utils.fragmentless(uri);
@@ -1111,7 +1112,7 @@ $rdf.Fetcher.prototype.fetch = function(uri, referringTerm, force) {
         });
 
         if (uriFetchState == 'unrequested') {
-            var result = self.requestURI(docUriToFetch, referringTerm, force);
+            var result = self.requestURI(docUriToFetch, referringTerm, force, options);
             if (result == null) {
                 // TODO not sure of the effect of this line. This may cause the promise to be resolved twice no?
                 deferred.resolve($rdf.pointedGraph(self.store, uriSym, docUriSym, docUriToFetchSym));

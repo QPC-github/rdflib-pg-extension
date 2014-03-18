@@ -1712,7 +1712,12 @@ if ((typeof module !== "undefined" && module !== null ? module.exports : void 0)
             var dom = frame.element;
             var attrs = dom.attributes;
             if (dom.nodeType === RDFParser.nodeType.TEXT || dom.nodeType === RDFParser.nodeType.CDATA_SECTION){
-                  //we have a literal
+                //we have a literal
+                if(frame.parent.nodeType == frame.NODE) {
+                    //must have had attributes, store as rdf:value
+                    frame.addArc(RDFParser.ns.RDF + 'value');
+                    frame = this.buildFrame(frame);
+                }
                 frame.addLiteral(dom.nodeValue);
             }
             else if (elementURI(dom)!== RDFParser.ns.RDF + "RDF"){
@@ -7460,7 +7465,7 @@ $rdf.Fetcher = function(store, timeout, async) {
 ** Changed 2013-08-20:  Added (ok, body) params to callback
 **
 **/
-    this.nowOrWhenFetched = function(uri, referringTerm, callback) {
+    this.nowOrWhenFetched = function(uri, referringTerm, callback, options) {
         var sta = this.getState(uri);
         if (sta == 'fetched') return callback(true);
         this.addCallback('done', function(uri2) {
@@ -7474,8 +7479,7 @@ $rdf.Fetcher = function(store, timeout, async) {
                     false, "Asynch fetch fail: " + status + " for " + uri);
             return (uri2 != uri); // Call me again?
         });
-        if (sta == 'unrequested') this.requestURI(
-        uri, referringTerm, false);
+        if (sta == 'unrequested') this.requestURI(uri, referringTerm, false, options);
     }
 
 
@@ -7509,14 +7513,19 @@ $rdf.Fetcher = function(store, timeout, async) {
     /** Requests a document URI and arranges to load the document.
      ** Parameters:
      **	    term:  term for the thing whose URI is to be dereferenced
-     **      rterm:  the resource which refered to this (for tracking bad links)
-     **      force:  Load the data even if loaded before
+     **     rterm:  the resource which refered to this (for tracking bad links)
+     **     force:  Load the data even if loaded before
+     **     options
+     **
+     ** Options available are:
+     ** - jqueryAjaxOptions: an object that permits to override JQuery.ajax default settings
+     **
      ** Return value:
      **	    The xhr object for the HTTP access
      **      null if the protocol is not a look-up protocol,
      **              or URI has already been loaded
      */
-    this.requestURI = function(docuri, rterm, force) { //sources_request_new
+    this.requestURI = function(docuri, rterm, force, options) { //sources_request_new
         if (docuri.indexOf('#') >= 0) { // hash
             throw ("requestURI should not be called with fragid: " + docuri);
         }
@@ -7856,16 +7865,6 @@ $rdf.Fetcher = function(store, timeout, async) {
             } // switch
         }; }
 
-        // Get privileges for cross-domain XHR
-        if (!(typeof tabulator != 'undefined' && tabulator.isExtension)) {
-            try {
-                $rdf.Util.enablePrivilege("UniversalXPConnect UniversalBrowserRead")
-            } catch (e) {
-                //(!CORS?)
-                //this.failFetch(xhr, "Failed to get (UniversalXPConnect UniversalBrowserRead) privilege to read different web site: " + docuri);
-                //return xhr;
-            }
-        }
 
         // Map the URI to a localhost proxy if we are running on localhost
         // This is used for working offline, e.g. on planes.
@@ -7882,14 +7881,16 @@ $rdf.Fetcher = function(store, timeout, async) {
         } else {
             // $rdf.log.warn("Localhost kludge OFF offline use: actually getting <" + uri2 + ">");
         }
-        
 
         // Setup the request
         if (typeof jQuery !== 'undefined' && jQuery.ajax) {
-            var xhr = jQuery.ajax({
+            var defaultJQueryAjaxSettings = {
                 url: uri2,
                 accepts: {'*': 'text/turtle,text/n3,application/rdf+xml'},
                 processData: false,
+                xhrFields: {
+                    withCredentials: true
+                },
                 timeout: sf.timeout,
                 error: function(xhr, s, e) {
                     if (s == 'timeout')
@@ -7900,12 +7901,22 @@ $rdf.Fetcher = function(store, timeout, async) {
                 success: function(d, s, xhr) {
                     onreadystatechangeFactory(xhr)();
                 }
-            });
+            };
+
+            // We merge the default ajax settings with the settings set as option so that the options settings
+            // can eventually override the default settings
+            // This can be useful to add an extra request header for exemple
+            // see https://github.com/linkeddata/rdflib.js/issues/36
+            var jqueryAjaxOptions = options && options.jqueryAjaxOptions ? options.jqueryAjaxOptions : {};
+            var finalSettings = $.extend(defaultJQueryAjaxSettings,jqueryAjaxOptions);
+
+            var xhr = jQuery.ajax(finalSettings);
         } else {
             var xhr = $rdf.Util.XMLHTTPFactory();
             xhr.onerror = onerrorFactory(xhr);
             xhr.onreadystatechange = onreadystatechangeFactory(xhr);
             xhr.timeout = sf.timeout;
+            xhr.withCredentials = true;
             xhr.ontimeout = function () {
                 sf.failFetch(xhr, "requestTimeout");
             }
@@ -7927,16 +7938,10 @@ $rdf.Fetcher = function(store, timeout, async) {
             try {
                 xhr.channel.notificationCallbacks = {
                     getInterface: function(iid) {
-                        if (!(typeof tabulator != 'undefined' && tabulator.isExtension)) {
-                            $rdf.Util.enablePrivilege("UniversalXPConnect")
-                        }
                         if (iid.equals(Components.interfaces.nsIChannelEventSink)) {
                             return {
 
                                 onChannelRedirect: function(oldC, newC, flags) {
-                                    if (!(typeof tabulator != 'undefined' && tabulator.isExtension)) {
-                                        $rdf.Util.enablePrivilege("UniversalXPConnect")
-                                    }
                                     if (xhr.aborted) return;
                                     var kb = sf.store;
                                     var newURI = newC.URI.spec;
@@ -8006,9 +8011,6 @@ $rdf.Fetcher = function(store, timeout, async) {
                                 
                                 // See https://developer.mozilla.org/en/XPCOM_Interface_Reference/nsIChannelEventSink
                                 asyncOnChannelRedirect: function(oldC, newC, flags, callback) {
-                                    if (!(typeof tabulator != 'undefined' && tabulator.isExtension)) {
-                                        $rdf.Util.enablePrivilege("UniversalXPConnect")
-                                    }
                                     if (xhr.aborted) return;
                                     var kb = sf.store;
                                     var newURI = newC.URI.spec;
@@ -8068,7 +8070,7 @@ $rdf.Fetcher = function(store, timeout, async) {
                                         kb.add(xhr.uri, kb.sym('http://www.w3.org/2007/ont/link#warning'), msg)
                                         newURI = newURI.slice(0, hash);
                                     }
-                                    var xhr2 = sf.requestURI(newURI, xhr.uri);
+                                    var xhr2 = sf.requestURI(newURI, xhr.uri, undefined, options);
                                     if (xhr2 && xhr2.req) kb.add(xhr.req,
                                         kb.sym('http://www.w3.org/2007/ont/link#redirectedRequest'),
                                         xhr2.req, sf.appNode); 
@@ -8126,16 +8128,6 @@ $rdf.Fetcher = function(store, timeout, async) {
             this.addStatus(xhr.req, "HTTP Request sent (using jQuery)");
         }
         
-
-        // Drop privs
-        if (!(typeof tabulator != 'undefined' && tabulator.isExtension)) {
-            try {
-                $rdf.Util.disablePrivilege("UniversalXPConnect UniversalBrowserRead")
-            } catch (e) {
-                throw ("Can't drop privilege: " + e)
-            }
-        }
-
         return xhr
     }
 
